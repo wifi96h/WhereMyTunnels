@@ -1,5 +1,6 @@
 #!/bin/bash
 <<License_Block
+
 MIT License
 
 Copyright (c) 2024 Androsh7
