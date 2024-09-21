@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Make me pretty:
-# xterm -ah -title tunnel_monitor_v0.3.sh ./tunnel_monitor_v0.3.sh
+# xterm -ah -title tunnel_monitor_v0.3.sh ./WhereMyTunnels.sh
 
 # Screen file:
 ssh_status="/tmp/ssh_status"
