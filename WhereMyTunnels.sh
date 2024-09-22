@@ -1,5 +1,8 @@
 #!/bin/bash
-<<License_Block
+<<Comment
+
+WhereMyTunnels.sh written by Androsh7
+https://github.com/Androsh7/WhereMyTunnels
 
 MIT License
 
@@ -23,7 +26,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-License_Block
+Comment
 
 # Make me pretty:
 # xterm -ah -title tunnel_monitor_v0.3.sh ./WhereMyTunnels.sh
