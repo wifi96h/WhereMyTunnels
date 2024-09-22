@@ -1,7 +1,7 @@
 #!/bin/bash
 <<Comment
 
-WhereMyTunnels.sh written by Androsh7
+WhereMyTunnels.sh v0.3 written by Androsh7
 https://github.com/Androsh7/WhereMyTunnels
 
 MIT License
