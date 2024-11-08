@@ -10,6 +10,7 @@ example_S =  "18706 ssh -S /tmp/mysock mysock -L 1111:127.0.0.1:22"
 
 ps_list = []
 ss_list = []
+ms_list = []
 
 def get_process_by_pid (pid):
     for line in ps_list:
@@ -29,6 +30,9 @@ def debug_print():
     print("SOCKET LIST:")
     for line in ss_list:
         print(line)
+    print("MASTER LIST:")
+    for line in ms_list:
+        print(line)
     print("----- DEBUG PRINT -----")
 
 while True:
@@ -37,10 +41,11 @@ while True:
     os.system(ps_command)
     os.system(ss_command)
 
-    # reads the process list
+    # Creates Process List
     with open('/tmp/ssh_ps', 'r') as file_handler:
         for line in file_handler:
-            line = line.rstrip()
+            print(line)
+            line = line.strip()
             pid = (re.split(" ", line, 1))[0]
             command = (re.split(" ", line, 1))[1]
 
@@ -50,37 +55,48 @@ while True:
 
             # Master Sockets and Forwards
             if re.search('ssh -\w*S\w*', command):
+                
                 # Master Socket
                 if re.search('ssh -\w*M\w*', command):
                     ssh_type = "MS"
-                    socket_file = str(re.search('S [a-zA-Z_/][\w+/]+', command).group().split(" ")[1])
+                    socket_file = re.search('S [a-zA-Z_/][\w+/]+', command).group().split(" ")[1]
                     destination = re.search('(\d{1,3}\.){3}\d{1,3}( -p ?\d+)?', command).group()
                     user_match = re.search('\w+@', command)
                     if user_match:
                         username = user_match.group().split("@")[0]
                     else:
-                        username = "CURRENT_USER"
+                        username = "CURR_USER"
 
                     port = re.search('-p.*', destination)
                     if not port:
                         port = "22"
                     else:
-                        port = re.search('\d+', destination.split(" ")[1:]).group()
+                        port = port.group().split("p")[1].strip()
 
                     argument.append(socket_file)
                     argument.append(username)
                     argument.append(destination)
                     argument.append(port)
-                # Forward
+                
+                # Socket Forward
                 else:
                     ssh_type = "S"
-                    socket_stuff = str(re.search('S [/\w]+ \w+', command).group().split(" ")[1:])
+                    socket_stuff = re.search('S [/\w]+ \w+', command).group().split(" ")[1:]
+                    print("Socket_stuff = ", type(socket_stuff))
                     socket_file = socket_stuff[0]
                     socket_name = socket_stuff[1]
-
+                    print(type(socket_file))
                     argument.append(socket_file)
                     argument.append(socket_name)
 
+                    # find source and dest ports
+                    src_dest = re.search("\d+:(\d{1,3}\.){3}\d{1,3}:\d+", command).group().split(":")
+                    src = src_dest[0]
+                    dst = src_dest[2]
+                    argument.append(src)
+                    argument.append(dst)
+
+                    print("arg", argument)
 
             # Traditional Tunnel
             elif re.search('ssh .* -[LD] ?\d+', command):
@@ -96,7 +112,7 @@ while True:
                     if not port:
                         port = "22"
                     else:
-                        port = re.search('\d+', destination.split(" ")[1:]).group()
+                        port = port.group().split("p")[1].strip()
 
                     argument.append(username)
                     argument.append(destination)
@@ -121,52 +137,60 @@ while True:
             else:
                 ssh_type = "SH"
                 destination = re.search('(\d{1,3}\.){3}\d{1,3}( -p ?\d+)?', command).group()
+                print("dest", destination.split(" ")[-1])
                 user_match = re.search('\w+@', command)
                 if user_match:
                     username = user_match.group().split("@")[0]
                 else:
-                    username = "CURRENT_USER"
+                    username = "CURR_USER"
 
                 port = re.search('-p.*', destination)
                 if not port:
                     port = "22"
                 else:
-                    port = re.search('\d+', destination.split(" ")[1:]).group()
+                    port = destination.split(" ")[-1]
 
                 argument.append(username)
-                argument.append(destination)
+                argument.append(destination.split(" ")[0])
                 argument.append(port)
 
 
             out_process = [0, pid, ssh_type, command, argument]
             ps_list.append(out_process)
-
+    
+    # Creating Socket List
     with open('/tmp/ssh_ss', 'r') as file_handler:
         for line in file_handler:
+            print(line)
             line = line.rstrip()
             #print("line:", line)
             pid = re.search('pid=\d+', line).group().split("=")[1]
             socket_type = re.search('^\w+ +\w+', line).group()
 
-            # Master Socekts
+            # Master Sockets
             if re.search('^u_str', socket_type):
-                if re.search('strESTAB', socket_type):
+                if re.search('ESTAB', socket_type):
                     socket_type = 'u_strESTAB'
-                elif re.search('strLISTEN', line):
+                elif re.search('LISTEN', line):
                     socket_type = 'u_strLISTEN'
 
-                socket = re.search('[/\w]+\.[a-zA-Z0-9]{5,} \d+', line).group()
-                socket_file = socket.split(".")[0]
-                socket_code = socket.split(" ")[1]
+                socket = re.search('[/\w]+\.[a-zA-Z0-9]{5,} \d+', line)
+                if socket:
+                    socket_file = socket.group().split(".")[0]
+                    socket_code = socket.group().split(" ")[1]
+                else:
+                    socket_file = "*"
+                    socket_code = "*"
+
 
                 out_process = [0, pid, socket_type, socket_file, socket_code]
                 ss_list.append(out_process)
                 continue
 
             # Traditional Tunnels and Other Sessions
-            if socket_type == "tcp  LISTEN":
+            if re.search('tcp +LISTEN', socket_type):
                 socket_type = "tcp_LISTEN"
-            elif socket_type == "tcp  ESTAB":
+            elif re.search('tcp +ESTAB', socket_type):
                 socket_type = "tcp_ESTAB"
 
             src_dest = re.search('(\d+\.){3}\d+:\d+ +(\d+\.){3}\d+:[\d+\*]+', line)
@@ -178,111 +202,91 @@ while True:
 
             out_socket = [0, pid, socket_type, src, dst]
             ss_list.append(out_socket)
+    
+    # build master_list
+    # [ parent_index, type, ps_list, ss_list ]
 
+    # adds all master sockets
+    for i in range(len(ss_list)):
+        if ss_list[i][2] == "u_strLISTEN" and ss_list[i][0] == 0:
+            ss_list[i][0] = 1
+            master_socket = [len(ms_list), "MS", "", ss_list[i]]
 
-    # organizing master sockets
+            # find connected process via socket
+            socket = ss_list[i][3]
+            for ps_line in ps_list:
+                if ps_line[0] == 0 and ps_line[2] == "MS" and ps_line[4][0] == socket:
+                    ps_line[0] = 1
+                    master_socket[2] = ps_line
+
+            # add the completed item to the master list
+            ms_list.append(master_socket)
+    
+    # adds all socket forwards
+    for i in range(len(ss_list)):
+        if ss_list[i][2] == "tcp_LISTEN" and ss_list[i][0] == 0:
+            ss_list[i][0] = 2
+            socket_forward = [-1, "S_FWD", "", ss_list[i]]
+
+            # find connected process via port
+            port = ss_list[i][3].split(":")[1]
+            for ps_line in ps_list:
+                if ps_line[0] == 0 and ps_line[2] == "S" and ps_line[4][2] == port:
+                    ps_line[0] = 2
+                    socket_forward[2] = ps_line
+
+            # determine parent socket
+            socket = socket_forward[2][4][0]
+            for i in range(len(ms_list)):
+                if ms_list[i][1] == "MS" and ms_list[i][3][3] == socket:
+                    socket_forward[0] = i
+                    break
+            ms_list.append(socket_forward)
+
+    # print lists
     MS_print = []
-    for socket in ss_list:
-        if socket[0] != 0 or socket[2] != "u_strLISTEN":
-            continue
-        socket[0] = 1
-        master_pid = socket[1]
-        master_sock = socket[3]
-
-        # master process and formatting
-        master_proc = get_process_by_pid(master_pid)
-        master_proc[0] = 1
-        MS_print.append(f"{master_sock} --> {master_proc[4][1]}@{master_proc[4][2]}:{master_proc[4][3]} - PID {master_pid}")
-
-        # get attached stuff
-        for socket in ss_list:
-            if socket[0] != 0 or socket[1] != master_pid:
-                continue
-            socket[0] = 2
-            if socket[2] == "tcp_LISTEN":
-                MS_print.append(f"\tFORWARD: {socket[3]} --> UNK")
-            else:
-                MS_print.append(f"\tSESSION: {socket[3]} --> {socket[4]}")
-
-    # organizing traditional sockets
     TRAD_print = []
-    for socket in ss_list:
-        if socket[0] != 0 or socket[2] != "tcp_LISTEN":
-            continue
-        master_pid = socket[1]
-
-        # master process and formatting
-        master_proc = get_process_by_pid(master_pid)
-        master_proc[0] = 3
-        TRAD_print.append(f"TRAD TUNNEL --> {master_proc[4][0]}@{master_proc[4][1]}:{master_proc[4][2]} - PID {master_pid}")
-        # verify forwards
-        for i in range(3,len(master_proc[4])):
-            # check for socket connection
-            found_match = False
-            for socket in ss_list:
-                if socket[0] != 0 or socket[2] != "tcp_LISTEN" or socket[1] != master_pid or socket[3] != f"127.0.0.1:{master_proc[4][i][0]}":
-
-                    continue
-                print(socket[3], " == ", f"127.0.0.1:{master_proc[4][i][0]}")
-                found_match = True
-                break
-            if found_match:
-                TRAD_print.append(f"\tFORWARD: 127.0.0.1:{master_proc[4][i][0]} --> {master_proc[4][i][1]}:{master_proc[4][i][2]}")
-                socket[0] = 3
-            else:
-                TRAD_print.append(f"\tERROR: 127.0.0.1:{master_proc[4][i][0]} --> {master_proc[4][i][1]}:{master_proc[4][i][2]} ERROR")
-
-        # get attached sessions
-        for socket in ss_list:
-            if socket[0] != 0 or socket[1] != master_pid:
-                continue
-            socket[0] = 2
-            MS_print.append(f"\tSESSION: {socket[3]} --> {socket[4]}")
-
     SH_print = []
-    # other tunnels
-    for socket in ss_list:
-        if socket != 0 or socket[2] != "tcp_ESTAB":
-            continue
-        socket[0] = 4
-        session_proc = get_process_by_pid(socket[1])
-        session_proc[0] = 4
-        SH_print.append(f"{socket[3]} --> {socket[4]} - PID {socket[1]}")
-        SH_print.append(f"\t{session_proc[3]}")
 
-    MAL_print = []
-    # malformed tunnels
-    for process in ps_list:
-        MAL_print.append(f"{process[3]} - PID {process[1]}")
-
-
-    # print header
+    # establish master socket and socket forward dependencies
+    # also include formatting
+    for i in range(len(ms_list)):
+        if ms_list[i][0] >= 0 and ms_list[i][1] == "MS":
+            MS_print.append(f"{ms_list[i][3][3]} --> {ms_list[i][2][4][2]}:{ms_list[i][2][4][3]} - PID {ms_list[i][2][1]}")
+            for z in range(len(ms_list)):
+                if ms_list[z][0] == i and ms_list[z][1] == "S_FWD":
+                    MS_print.append(f"\t{ms_list[z][3][3]} --> {ms_list[z][3][4]}")
+    
     os.system("clear")
-    print("------------------ WhereMyTunnels V0.4 -------------------")
-    print("------------------ Written by Androsh7 -------------------\n")
+    print("-" * 10, "WhereMyTunnels V0.4", "-" * 10)
+    print("-" * 10, "Written by Androsh7", "-" * 10, "\n")
+    
 
-    # print master sockets
+    # Master Socket Print Block
     if len(MS_print):
-        print("MASTER SOCKETS AND FORWARDS:")
+        print("Master Sockets and Forwards:", "\033[1;34m")
         for line in MS_print:
             print(line)
+        print("\033[0m")
 
-    # print traditional tunnels
+    # Traditional Tunnel Print Block
     if len(TRAD_print):
-        print("TRADITIONAL TUNNELS:")
+        print("Traditional Tunnels:")
         for line in TRAD_print:
             print(line)
 
-    # print other sessions
+    # Standard Session Print Block
     if len(SH_print):
-        print("OTHER SESSIONS:")
+        print("Standard SSH Sessions")
         for line in SH_print:
             print(line)
 
-    # print malformed sessions
-    if len(SH_print):
-        print("MALFORMED SESSIONS:")
-        for line in MAL_print:
-            print(line)
+    ps_list.clear()
+    ss_list.clear()
+    ms_list.clear()
+
+    MS_print.clear()
+    TRAD_print.clear()
+    SH_print.clear()
 
     os.system("sleep 1")
