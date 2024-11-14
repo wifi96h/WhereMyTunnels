@@ -481,4 +481,4 @@ while True:
     ss_list.clear()
     ms_list.clear()
     malformed_list.clear()
-    time.sleep(100)
+    time.sleep(1500)
