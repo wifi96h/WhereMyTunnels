@@ -44,19 +44,19 @@ def get_process_by_pid (pid):
     for line in ps_list:
         if line["pid"] == pid:
             return line
-    print("Could not find process with pid", pid)
+    if debug : print("Could not find process with pid", pid)
     
 def get_process_by_src_port (type, src_port):
     for line in ps_list:
         if line["type"] == type and line["src_port"] == src_port:
             return line
-    print("Could not find process with a type of", type, "and a source port of", src_port)
+    if debug : print("Could not find process with a type of", type, "and a source port of", src_port)
     
 def get_socket_by_pid (pid):
     for line in ss_list:
         if line["pid"] == pid:
             return line
-    print("Could not find socket with pid", pid)
+    if debug : print("Could not find socket with pid", pid)
     
 
 def debug_print ():
@@ -75,11 +75,14 @@ def debug_print ():
 def clear_screen ():
     os.system("clear") # Switch to test on windows
 
+blue = "\033[1;34m"
+red = "\033[1;31m"
+RST_color = "\033[0m"
+
 def strip_dest_info(command):
     # Grabs the ip and port (if specified)
     # note the extra space to the left of the ip address regex is so it doesn't return the forwarding ip address, which looks like so "22:127.0.0.1:44" the addition of the space prevents this
     destination = re.search(' (\d{1,3}\.){3}\d{1,3}( -p ?\d+)?', command).group().lstrip()
-    print("\n", destination, "HELLO")
     # tries to remove the port, if it isn't specified then assume it is 22 and keep the destination as is
     # if the port is specified, then use regex to seperate the ip and port from the destination string
     port = re.search('-p.*', destination)
@@ -125,7 +128,7 @@ def strip_forward_info (command):
             dest_ip = forward_srcdest[1]
             src_port = forward_srcdest[2]
         else:
-            print("could not identify forward type")
+            if debug : print("could not identify forward type")
             continue
         
         # build forward entry
@@ -140,7 +143,7 @@ def strip_forward_info (command):
     
     dynamic_forwards = re.findall('-\w*D\w* ?\d{1,6}', command)
     for line in dynamic_forwards:
-        print("DYNAMIC FORWARDS ARE NOT CURRENTLY SUPPORTED")
+        if debug : print("DYNAMIC FORWARDS ARE NOT CURRENTLY SUPPORTED")
     
     return forward_list
 
@@ -258,7 +261,7 @@ while True:
                 try:
                     socket = re.search('[/\w]+\.[a-zA-Z0-9]{5,} \d+', line).group()
                 except:
-                    print("Unknown Socket Detected, ignoring socket")
+                    if debug : print("Unknown Socket Detected, ignoring socket")
                     continue
                 
                 # see the above documentation for an explanation, this breaks up the socket_file I.E: "/tmp/test" and the socket_code I.E: "BiD6RlLl7ZqhQS2w"
@@ -281,7 +284,7 @@ while True:
             
             # this aborts if no source and destination is found
             if not src_dest:
-                print("Could not find a valid source and/or destination ip for the socket, ignoring socket")
+                if debug : print("Could not find a valid source and/or destination ip for the socket, ignoring socket")
                 continue 
 
             # this section is all about breaking apart the src_dest into, src_port, src_ip, dst_port, dst_ip
@@ -316,14 +319,14 @@ while True:
            
             # if no socket is attached then the process is malformed
             if not master_socket:
-                print("MALFORMED Master Socket Detected")
+                if debug : print("MALFORMED Master Socket Detected")
                 malformed_list.append("{} - PID {}".format(master_process["command"], master_process["pid"]))
                 master_process["org_num"] = -2 # mark is malformed
                 continue
             
             # additional check to ensure valid selection
             if not (master_socket["socket_file"] == master_process["socket_file"]):
-                print("Master socket with matching socket and process pids do not have matching socket_file :(")
+                if debug : print("Master socket with matching socket and process pids do not have matching socket_file :(")
                 continue
             
             master_process["org_num"] = 1 # mark as sorted
@@ -344,8 +347,7 @@ while True:
                 if child_process["org_num"] == 0 and child_process["type"] == "S" and child_process["socket_file"] == master_process["socket_file"]:
                     
                     child_process["org_num"] = 1 # mark as sorted
-                    print(child_process)
-                    print(child_process["forwards"])
+
                     # go through each forward and attempt to find a matching socket connection
                     
                     found_socket = False
@@ -358,7 +360,7 @@ while True:
                                 found_socket = True
                                 break
                         if not found_socket:
-                            print("could not find socket associated with forward")
+                            if debug : print("could not find socket associated with forward")
                             malformed_list.append(str(forward_process) + str(child_process["pid"]))
                     
                     child_entry = {
@@ -403,7 +405,7 @@ while True:
                         forward_process["socket"] = forward_socket
                 
                 if not found_socket:
-                    print("could not find socket associated with forward")
+                    if debug : print("could not find socket associated with forward")
                     malformed_list.append(str(forward_process) + str(process["pid"]))
             
             entry = {
@@ -439,46 +441,50 @@ while True:
     print('-' * 20, "---- By Androsh7 ----", '-' * 20, sep="")
     
     # print master sockets
-    print("Master Sockets and Forwards:")
+    print("Master Sockets and Forwards:" + blue)
     for item in ms_list:
         if item["type"] == "MS" and item["org_num"] == 0:
-            print("\t{} {}@{}:{} - PID {}".format(item["socket"]["socket_file"], item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # MASTER SOCKET PRINT FORMAT
+            print("    {} {}@{}:{} - PID {}".format(item["socket"]["socket_file"], item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # MASTER SOCKET PRINT FORMAT
             
             # print all socket forwards
             for child_item in item["attached"]:
                 if child_item["type"] == "S_FWD" and child_item["org_num"] == 0:
-                    print("\t\tFWD: \"{}\" - PID {}".format(child_item["process"]["forward_name"], child_item["pid"])) # SOCKET FORWARD PRINT FORMAT
+                    print("        FWD: \"{}\" - PID {}".format(child_item["process"]["forward_name"], child_item["pid"])) # SOCKET FORWARD PRINT FORMAT
                     for forward in child_item["process"]["forwards"]:
-                        print("\t\t\t 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
+                        print("             127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
             
             # print all socket sessions
             for child_item in item["attached"]:
                 if child_item["type"] == "S_SH" and child_item["org_num"] == 0:
                     print("\t\tSESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
+    print(RST_color)
     
     # print traditional forwards
-    print("Traditional Forwards:")
+    print("Traditional Forwards:" + blue)
     for item in ms_list:
         if item["type"] == "TD" and item["org_num"] == 0:
-            print("\tForward - PID {}".format(item["pid"])) # FORWARD PRINT FORMAT
+            print("    Forward - PID {}".format(item["pid"])) # FORWARD PRINT FORMAT
             for forward in item["process"]["forwards"]:
-                print("\t\t 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
+                print("         127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
+    print(RST_color)
     
     # print regular sessions
-    print("Regular Sessions")
+    print("Regular Sessions" + blue)
     for item in ms_list:
         if item["type"] == "SH" and item["org_num"] == 0:
-            print("\tSESSION: 127.0.0.1 --> {}:{} - PID {}".format(item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"]))
+            print("    SESSION: 127.0.0.1 --> {}:{} - PID {}".format(item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"]))
+    print(RST_color)
     
     # print malformed sessions
     if len(malformed_list):
-        print("Malformed Sessions:")
+        print("Malformed Sessions:" + red)
         for item in malformed_list:
             print(item)
+        print(RST_color)
 
     # cleaning
     ps_list.clear()
     ss_list.clear()
     ms_list.clear()
     malformed_list.clear()
-    time.sleep(100)
+    time.sleep(2)
