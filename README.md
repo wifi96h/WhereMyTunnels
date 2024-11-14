@@ -1,9 +1,6 @@
 # WhereMyTunnels
-A bash script that checks for ssh connections, tunnels, and master sockets on linux
+This is a python tool to view current ssh connections on linux to help diagnose and keep track when tunneling
 
-To run this as a separate monitor run:
-```
-xterm -ah -title WhereMyTunnels ./WhereMyTunnels.sh &
-```
+Version 0.4 is here, now in python. for those wanting the legacy version in bash, it is included in the github legacy folder.
 
-NOTE: there are currently a lot of issues with V0.3, V0.4 should iron out the issues and is set to be completed by 11/15/24
+## Limitations
