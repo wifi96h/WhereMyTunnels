@@ -29,8 +29,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
-ps_file = "ssh_ps_demo" # ssh proccesses are written to this file
-ss_file = "ssh_ss_demo" # ssh sockets are written to this file
+ps_file = "/tmp/ssh_ps" # ssh proccesses are written to this file
+ss_file = "/tmp/ssh_ss" # ssh sockets are written to this file
 
 ps_command = r'ps -ao pid,args -w --no-headers | grep "[s]sh .*" > ' + ps_file
 ss_command = r'ss -nap | grep "ssh\"" > ' + ss_file
@@ -73,7 +73,7 @@ def debug_print ():
     print("----- DEBUG PRINT -----")
     
 def clear_screen ():
-    os.system("cls")
+    os.system("clear") # Switch to test on windows
 
 def strip_dest_info(command):
     # Grabs the ip and port (if specified)
@@ -149,8 +149,8 @@ debug = False
 while True:
 
     # writes commands to a file
-    #os.system(ps_command)
-    #os.system(ss_command)
+    os.system(ps_command)
+    os.system(ss_command)
 
     # reads the process file
     if debug : print("----- Reading ssh_ps -----")
