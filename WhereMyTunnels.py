@@ -159,156 +159,162 @@ while True:
     if debug : print("----- Reading ssh_ps -----")
     with open(ps_file, 'r') as file_handler:
         for line in file_handler:
-            if debug : print("Reading line: ", line)
-            line = line.strip()
-            pid = (re.split(" ", line, 1))[0]
-            command = (re.split(" ", line, 1))[1]
+            try:
+                if debug : print("Reading line: ", line)
+                line = line.strip()
+                pid = (re.split(" ", line, 1))[0]
+                command = (re.split(" ", line, 1))[1]
 
-            # Master Sockets and Forwards
-            if re.search('ssh -\w*S\w*', command):
-                # Master Socket
-                if re.search('ssh -\w*M\w*', command):
-                    socket_file = str(re.search('S [a-zA-Z_/][\w+/]+', command).group().split(" ")[1])
-                    
+                # Master Sockets and Forwards
+                if re.search('ssh -\w*S\w*', command):
+                    # Master Socket
+                    if re.search('ssh -\w*M\w*', command):
+                        socket_file = str(re.search('S [a-zA-Z_/][\w+/]+', command).group().split(" ")[1])
+                        
+                        dest_info = strip_dest_info(command)
+                        
+                        # Formatting
+                        out_process = {
+                            "org_num" : 0, # used for organization
+                            "pid" : pid,
+                            "type" : "MS", # master socket
+                            "command" : command,
+                            "socket_file" : socket_file,
+                            "user" : dest_info["username"],
+                            "dest_ip" : dest_info["dest_ip"],
+                            "dest_port" : dest_info["dest_port"],
+                        }
+                        ps_list.append(out_process)
+                        continue
+                    # Forward
+                    else:
+                        # socket_stuff is the combination of the socket file and the forward name
+                        # I.E: /tmp/mysock mysock
+                        socket_stuff = re.search('S [/\w]+ \w+', command).group().split(" ")[1:]
+                        socket_file = socket_stuff[0]
+                        forward_name = socket_stuff[1]
+                                            
+                        forwards = strip_forward_info(command)
+                        
+                        out_process = {
+                            "org_num" : 0,
+                            "pid" : pid,
+                            "type" : "S", # master socket forward type
+                            "command" : command,
+                            "socket_file" : socket_file,
+                            "forward_name" : forward_name, # this is the actual label for the forward
+                            "forwards" : forwards
+                        }
+                        ps_list.append(out_process)
+                        continue
+
+                # Traditional Tunnel
+                elif re.search('ssh .* -[LRD] ?\d+', command):
                     dest_info = strip_dest_info(command)
-                    
-                    # Formatting
+                    forwards = strip_forward_info(command)
+
                     out_process = {
+                        "org_num" : 0,
+                        "pid" : pid,
+                        "type" : "TD", # traditional forward
+                        "command" : command,
+                        "user" : dest_info["username"],
+                        "dest_ip" : dest_info["dest_ip"],
+                        "dest_port" : dest_info["dest_port"],
+                        "forwards" : forwards
+                    }
+                # Other Sessions
+                else:
+                    dest_info = strip_dest_info(command)
+                
+                # Formatting
+                out_process = {
                         "org_num" : 0, # used for organization
                         "pid" : pid,
-                        "type" : "MS", # master socket
+                        "type" : "SH", # regular session
                         "command" : command,
-                        "socket_file" : socket_file,
                         "user" : dest_info["username"],
                         "dest_ip" : dest_info["dest_ip"],
                         "dest_port" : dest_info["dest_port"],
                     }
-                    ps_list.append(out_process)
-                    continue
-                # Forward
-                else:
-                    # socket_stuff is the combination of the socket file and the forward name
-                    # I.E: /tmp/mysock mysock
-                    socket_stuff = re.search('S [/\w]+ \w+', command).group().split(" ")[1:]
-                    socket_file = socket_stuff[0]
-                    forward_name = socket_stuff[1]
-                                        
-                    forwards = strip_forward_info(command)
-                    
-                    out_process = {
-                        "org_num" : 0,
-                        "pid" : pid,
-                        "type" : "S", # master socket forward type
-                        "command" : command,
-                        "socket_file" : socket_file,
-                        "forward_name" : forward_name, # this is the actual label for the forward
-                        "forwards" : forwards
-                    }
-                    ps_list.append(out_process)
-                    continue
-
-            # Traditional Tunnel
-            elif re.search('ssh .* -[LRD] ?\d+', command):
-                dest_info = strip_dest_info(command)
-                forwards = strip_forward_info(command)
-
-                out_process = {
-                    "org_num" : 0,
-                    "pid" : pid,
-                    "type" : "TD", # traditional forward
-                    "command" : command,
-                    "user" : dest_info["username"],
-                    "dest_ip" : dest_info["dest_ip"],
-                    "dest_port" : dest_info["dest_port"],
-                    "forwards" : forwards
-                }
-            # Other Sessions
-            else:
-               dest_info = strip_dest_info(command)
-               
-               # Formatting
-               out_process = {
-                    "org_num" : 0, # used for organization
-                    "pid" : pid,
-                    "type" : "SH", # regular session
-                    "command" : command,
-                    "user" : dest_info["username"],
-                    "dest_ip" : dest_info["dest_ip"],
-                    "dest_port" : dest_info["dest_port"],
-                }
-               if debug : print("Creating Process [{}]".format(out_process))
-               ps_list.append(out_process)
-               continue
+                if debug : print("Creating Process [{}]".format(out_process))
+                ps_list.append(out_process)
+                continue
+            except:
+                malformed_list.append(line)
     
     # read the socket file
     if debug : print("----- reading ssh_ss -----")
     with open(ss_file, 'r') as file_handler:
         for line in file_handler:
-            if debug : print("reading line: [{}]".format(line))
-            line = line.rstrip()
+            try:
+                if debug : print("reading line: [{}]".format(line))
+                line = line.rstrip()
 
-            pid = re.search('pid=\d+', line).group().split("=")[1]
-            
-            # this find the initial label for the type of socket I.E: "tcp  LISTEN"
-            # this section also uses the regex substitution method to remove all spaces
-            socket_type = re.sub(' ', '', re.search('^\w+ +\w+', line).group())
-
-            # Master Socekts
-            if re.search('^u_str', socket_type):
-                # this is a little strange to explain, most master sockets have this in the middle: "/tmp/test.BiD6RlLl7ZqhQS2w" 
-                # it includes the socket file and a unique alphanumeric string
-                # however some have this instead "*", these are duplicates and should be ignored for our purposes
-                try:
-                    socket = re.search('[/\w]+\.[a-zA-Z0-9]{5,} \d+', line).group()
-                except:
-                    if debug : print("Unknown Socket Detected, ignoring socket")
-                    continue
+                pid = re.search('pid=\d+', line).group().split("=")[1]
                 
-                # see the above documentation for an explanation, this breaks up the socket_file I.E: "/tmp/test" and the socket_code I.E: "BiD6RlLl7ZqhQS2w"
-                # currently there is no use for the socket_code in the program
-                socket_file = socket.split(".")[0]
-                socket_code = socket.split(" ")[1]
+                # this find the initial label for the type of socket I.E: "tcp  LISTEN"
+                # this section also uses the regex substitution method to remove all spaces
+                socket_type = re.sub(' ', '', re.search('^\w+ +\w+', line).group())
 
+                # Master Socekts
+                if re.search('^u_str', socket_type):
+                    # this is a little strange to explain, most master sockets have this in the middle: "/tmp/test.BiD6RlLl7ZqhQS2w" 
+                    # it includes the socket file and a unique alphanumeric string
+                    # however some have this instead "*", these are duplicates and should be ignored for our purposes
+                    try:
+                        socket = re.search('[/\w]+\.[a-zA-Z0-9]{5,} \d+', line).group()
+                    except:
+                        if debug : print("Unknown Socket Detected, ignoring socket")
+                        continue
+                    
+                    # see the above documentation for an explanation, this breaks up the socket_file I.E: "/tmp/test" and the socket_code I.E: "BiD6RlLl7ZqhQS2w"
+                    # currently there is no use for the socket_code in the program
+                    socket_file = socket.split(".")[0]
+                    socket_code = socket.split(" ")[1]
+
+                    out_socket = {
+                        "org_num" : 0,
+                        "pid" : pid,
+                        "type" : socket_type,
+                        "socket_file" : socket_file,
+                        "socket_code" : socket_code,
+                    }
+                    ss_list.append(out_socket)
+                    continue
+
+                # Traditional Tunnels and Other Sessions
+                src_dest = re.search('(\d+\.){3}\d+:\d+ +(\d+\.){3}\d+:[\d+\*]+', line) # example result: "127.0.0.1:1111 0.0.0.0:*"
+                
+                # this aborts if no source and destination is found
+                if not src_dest:
+                    if debug : print("Could not find a valid source and/or destination ip for the socket, ignoring socket")
+                    continue 
+
+                # this section is all about breaking apart the src_dest into, src_port, src_ip, dst_port, dst_ip
+                src_dest = re.split(' +', src_dest.group()) # this splits the src_dest string in half (src and dest) by the space in the middle
+                
+                # little complicated, here is the breakdown:
+                # src_dest = ["127.0.0.1:1111", "0.0.0.0:*"]
+                # each of these are then broken down by the ":"
+                src_ip = src_dest[0].split(":")[0] 
+                src_port = src_dest[0].split(":")[1]
+                dest_ip = src_dest[1].split(":")[0]
+                dest_port = src_dest[1].split(":")[1] # note this may be "*" since listening ports do not have a specified destination
+                
                 out_socket = {
                     "org_num" : 0,
                     "pid" : pid,
                     "type" : socket_type,
-                    "socket_file" : socket_file,
-                    "socket_code" : socket_code,
+                    "src_ip" : src_ip,
+                    "src_port" : src_port,
+                    "dest_ip" : dest_ip,
+                    "dest_port" : dest_port,
                 }
+                if debug : print("Creating Socket: [{}]".format(out_socket))
                 ss_list.append(out_socket)
-                continue
-
-            # Traditional Tunnels and Other Sessions
-            src_dest = re.search('(\d+\.){3}\d+:\d+ +(\d+\.){3}\d+:[\d+\*]+', line) # example result: "127.0.0.1:1111 0.0.0.0:*"
-            
-            # this aborts if no source and destination is found
-            if not src_dest:
-                if debug : print("Could not find a valid source and/or destination ip for the socket, ignoring socket")
-                continue 
-
-            # this section is all about breaking apart the src_dest into, src_port, src_ip, dst_port, dst_ip
-            src_dest = re.split(' +', src_dest.group()) # this splits the src_dest string in half (src and dest) by the space in the middle
-            
-            # little complicated, here is the breakdown:
-            # src_dest = ["127.0.0.1:1111", "0.0.0.0:*"]
-            # each of these are then broken down by the ":"
-            src_ip = src_dest[0].split(":")[0] 
-            src_port = src_dest[0].split(":")[1]
-            dest_ip = src_dest[1].split(":")[0]
-            dest_port = src_dest[1].split(":")[1] # note this may be "*" since listening ports do not have a specified destination
-            
-            out_socket = {
-                "org_num" : 0,
-                "pid" : pid,
-                "type" : socket_type,
-                "src_ip" : src_ip,
-                "src_port" : src_port,
-                "dest_ip" : dest_ip,
-                "dest_port" : dest_port,
-            }
-            if debug : print("Creating Socket: [{}]".format(out_socket))
-            ss_list.append(out_socket)
+            except:
+                pass
     
     # create master list
     
