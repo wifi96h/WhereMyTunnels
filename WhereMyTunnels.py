@@ -1,4 +1,4 @@
-# PUT YOUR SHEBANG HERE
+#!/usr/bin/python3
 import os
 import re
 import time
@@ -32,6 +32,8 @@ SOFTWARE.
 ps_file = "/tmp/ssh_ps" # ssh proccesses are written to this file
 ss_file = "/tmp/ssh_ss" # ssh sockets are written to this file
 
+debug = False # enables the debug printing
+
 ps_command = r'ps -ao pid,args -w --no-headers | grep "[s]sh .*" > ' + ps_file
 ss_command = r'ss -nap | grep "ssh\"" > ' + ss_file
 
@@ -39,6 +41,8 @@ ps_list = []
 ss_list = []
 ms_list = []
 malformed_list = []
+
+
 
 def get_process_by_pid (pid):
     for line in ps_list:
@@ -137,7 +141,7 @@ def strip_forward_info (command):
             "src_port" : src_port,
             "dest_ip" : dest_ip,
             "dest_port" : dest_port,
-            "socket" : {}
+            "socket" : {},
         }
         forward_list.append(forward)
     
@@ -146,8 +150,6 @@ def strip_forward_info (command):
         if debug : print("DYNAMIC FORWARDS ARE NOT CURRENTLY SUPPORTED")
     
     return forward_list
-
-debug = False
 
 while True:
 
@@ -185,7 +187,6 @@ while True:
                             "dest_port" : dest_info["dest_port"],
                         }
                         ps_list.append(out_process)
-                        continue
                     # Forward
                     else:
                         # socket_stuff is the combination of the socket file and the forward name
@@ -206,13 +207,11 @@ while True:
                             "forwards" : forwards
                         }
                         ps_list.append(out_process)
-                        continue
 
                 # Traditional Tunnel
-                elif re.search('ssh .* -[LRD] ?\d+', command):
+                elif re.search('ssh .* -[LR] ?\d+', command):
                     dest_info = strip_dest_info(command)
                     forwards = strip_forward_info(command)
-
                     out_process = {
                         "org_num" : 0,
                         "pid" : pid,
@@ -223,24 +222,24 @@ while True:
                         "dest_port" : dest_info["dest_port"],
                         "forwards" : forwards
                     }
+                    ps_list.append(out_process)
                 # Other Sessions
                 else:
                     dest_info = strip_dest_info(command)
                 
-                # Formatting
-                out_process = {
+                    # Formatting
+                    out_process = {
                         "org_num" : 0, # used for organization
                         "pid" : pid,
                         "type" : "SH", # regular session
                         "command" : command,
                         "user" : dest_info["username"],
                         "dest_ip" : dest_info["dest_ip"],
-                        "dest_port" : dest_info["dest_port"],
+                        "dest_port" : dest_info["dest_port"]
                     }
-                if debug : print("Creating Process [{}]".format(out_process))
-                ps_list.append(out_process)
-                continue
+                    ps_list.append(out_process)
             except:
+                if debug : print("MALFORMED SESSION")
                 malformed_list.append(line)
     
     # read the socket file
@@ -367,7 +366,7 @@ while True:
                                 break
                         if not found_socket:
                             if debug : print("could not find socket associated with forward")
-                            malformed_list.append(str(forward_process) + str(child_process["pid"]))
+                            forward_process["type"] = "MALFORMED"
                     
                     child_entry = {
                         "org_num" : 0,
@@ -380,7 +379,7 @@ while True:
             # find attached sessions
             for child_socket in ss_list:
                 if child_socket["org_num"] == 0 and child_socket["pid"] == master_process["pid"]:
-                    if child_socket["type"] == "tcpLISTEN":
+                    if child_socket["type"] == "tcpESTAB":
                         
                         child_socket["org_num"] = 1 # mark as sorted
                         
@@ -394,40 +393,67 @@ while True:
                             "dest_port" : child_socket["dest_port"],
                         }
                         master_entry["attached"].append(child_entry)
-                    elif child_socket["type"] == "u_strLISTEN":
+                    elif child_socket["type"] == "u_strESTAB":
                         child_socket["org_num"] = -1 # mark as ignored
                         
     
-    # add traditiona forwards to the master list
+    # add traditional forwards to the master list
     for process in ps_list:
         if process["org_num"] == 0 and process["type"] == "TD":
             process["org_num"] = 1 # mark as sorted
-            
-            for forward_process in process["forwards"]:
-                # find each forward's associated socket
-                found_socket = False
-                for forward_socket in ss_list:
-                    if forward_socket["org_num"] == 0 and forward_socket["type"] == "tcpLISTEN" and forward_socket["pid"] == process["pid"] and forward_process["src_port"] == forward_socket["src_port"]:
-                        forward_process["socket"] = forward_socket
-                
-                if not found_socket:
-                    if debug : print("could not find socket associated with forward")
-                    malformed_list.append(str(forward_process) + str(process["pid"]))
             
             entry = {
                 "org_num" : 0,
                 "pid" : process["pid"],
                 "type" : "TD",
                 "process" : process,
+                "attached" : []
             }
+            ms_list.append(entry)
+            
+            # find sockets for the forwards
+            for forward_process in process["forwards"]:
+                # find each forward's associated socket
+                found_socket = False
+                for forward_socket in ss_list:
+                    if forward_socket["org_num"] == 0 and forward_socket["type"] == "tcpLISTEN" and forward_socket["pid"] == process["pid"] and forward_process["src_port"] == forward_socket["src_port"]:
+                        forward_process["socket"] = forward_socket
+                        forward_socket["org_num"] = 1 # mark as sorted
+                        found_socket = True
+                
+                if not found_socket:
+                    if debug : print("could not find socket associated with forward")
+                    forward_process["type"] = "MALFORMED"
+            
+            # find attached sessions
+            for child_socket in ss_list:
+                if child_socket["org_num"] == 0 and child_socket["pid"] == process["pid"] and child_socket["type"] == "tcpESTAB":
+                    child_socket["org_num"] = 1 # mark as sorted
 
-    # add traditional forwards and regular sessions to the master list
+                    child_entry = {
+                        "org_num" : 0,
+                        "pid" : child_socket["pid"],
+                        "type" : "S_SH",
+                        "src_ip" : child_socket["src_ip"],
+                        "src_port" : child_socket["src_port"],
+                        "dest_ip" : child_socket["dest_ip"],
+                        "dest_port" : child_socket["dest_port"],
+                    }
+                    entry["attached"].append(child_entry)
+
+    # add regular sessions to the master list
     # NOTE: these are a lot simpler since the PIDs are unique
     for socket in ss_list:
-        if socket["org_num"] == 0 and (socket["type"] == "tcpESTAB" or socket["type"] == "tcpLISTEN"):
+        if socket["org_num"] == 0 and socket["type"] == "tcpESTAB":
+            print(socket)
+
             # grab associated process
             process = get_process_by_pid(socket["pid"])
             
+            if not process:
+                if debug : print("could not find process with pid", socket["pid"])
+                continue
+
             socket["org_num"] = 1 # mark as sorted
             process["org_num"] = 1 # mark as sorted
             
@@ -450,35 +476,60 @@ while True:
     print("Master Sockets and Forwards:" + blue)
     for item in ms_list:
         if item["type"] == "MS" and item["org_num"] == 0:
-            print("    {} {}@{}:{} - PID {}".format(item["socket"]["socket_file"], item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # MASTER SOCKET PRINT FORMAT
+            print("{} {}@{}:{} - PID {}".format(item["socket"]["socket_file"], item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # MASTER SOCKET PRINT FORMAT
             
             # print all socket forwards
             for child_item in item["attached"]:
                 if child_item["type"] == "S_FWD" and child_item["org_num"] == 0:
-                    print("        FWD: \"{}\" - PID {}".format(child_item["process"]["forward_name"], child_item["pid"])) # SOCKET FORWARD PRINT FORMAT
+                    child_item["org_num"] = 1 # mark as printed
+                    print("    FWD Proc: \"{}\" - PID {}".format(child_item["process"]["forward_name"], child_item["pid"])) # SOCKET FORWARD PRINT FORMAT
                     for forward in child_item["process"]["forwards"]:
-                        print("             127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
+                        if forward["type"] == "MALFORMED" : print(red, end="")
+                        print("        FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"])) # FORWARD DATA PRINT
+                        print(blue, end="")
+
+                        # find attached sessions
+                        for session in item["attached"]:
+                            if session["org_num"] == 0 and session["type"] == "S_SH" and session["src_port"] == forward["src_port"]:
+                                session["org_num"] = 1 # mark as printed
+                                print("            SESSION: {}:{} --> {}:{}".format(session["src_ip"], session["src_port"],session["dest_ip"], session["dest_port"]))
             
-            # print all socket sessions
+            # print all remaining associated sessions
             for child_item in item["attached"]:
-                if child_item["type"] == "S_SH" and child_item["org_num"] == 0:
-                    print("\t\tSESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
+                if child_item["org_num"] == 0 and child_item["type"] == "S_SH":
+                    pass
+                    print("    ASSOCIATED SESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
     print(RST_color)
     
     # print traditional forwards
     print("Traditional Forwards:" + blue)
     for item in ms_list:
         if item["type"] == "TD" and item["org_num"] == 0:
-            print("    Forward - PID {}".format(item["pid"])) # FORWARD PRINT FORMAT
+            print("FWD Proc: --> {}@{}:{} - PID {}".format(item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # FORWARD PRINT FORMAT
             for forward in item["process"]["forwards"]:
-                print("         127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
+                # change text to red for malformed forwards
+                if forward["type"] == "MALFORMED" : print(red, end="")
+                print("    FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
+                print(blue, end="")
+
+                # find attached sessions
+                for session in item["attached"]:
+                    if session["org_num"] == 0 and session["type"] == "S_SH" and session["src_port"] == forward["src_port"]:
+                        session["org_num"] = 1 # mark as printed
+                        print("        SESSION: {}:{} --> {}:{}".format(session["src_ip"], session["src_port"],session["dest_ip"], session["dest_port"]))
+
+            # print all remaining associated sessions
+            for child_item in item["attached"]:
+                if child_item["org_num"] == 0 and child_item["type"] == "S_SH":
+                    print("    ASSOCIATED SESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
+
     print(RST_color)
     
     # print regular sessions
     print("Regular Sessions" + blue)
     for item in ms_list:
         if item["type"] == "SH" and item["org_num"] == 0:
-            print("    SESSION: 127.0.0.1 --> {}:{} - PID {}".format(item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"]))
+            print("SESSION: 127.0.0.1 --> {}:{} - PID {}\n    {}".format(item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"], item["process"]["command"][:150]))
     print(RST_color)
     
     # print malformed sessions
@@ -487,6 +538,8 @@ while True:
         for item in malformed_list:
             print(item)
         print(RST_color)
+    
+    if debug : debug_print()
 
     # cleaning
     ps_list.clear()
