@@ -330,13 +330,13 @@ while True:
                 continue
             
             # additional check to ensure valid selection
-            
             try:
                 if not (master_socket["socket_file"] == master_process["socket_file"]):
                     if debug : print("Master socket with matching socket and process pids do not have matching socket_file :(")
                     continue
             except:
                 break
+
             master_process["org_num"] = 1 # mark as sorted
             master_socket["org_num"] = 1 # mark as sorted
             
