@@ -537,7 +537,7 @@ while True:
             ms_list.append(ssh_entry)
     
 
-    clear_screen()
+    cli.clear_screen()
 
     cli.render_line('-' * 20 + " WhereMyTunnels V0.4 " + '-' * 20)
     cli.render_line('-' * 20 + "---- By Androsh7 ----" + '-' * 20)
@@ -618,9 +618,6 @@ while True:
     ss_list.clear()
     ms_list.clear()
     malformed_list.clear()
-
-    # DEBUG REMOVE ME
-    
 
     # reseting cli_render class attributes
     cli.clear_remaining()
