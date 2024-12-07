@@ -341,4 +341,4 @@ Print Malformed Sessions
     Print Sessions
 ```
 
-Note: a tag of "MALFORMED" may be added to forwards that have a process but not associated `"tcpLISTEN"` socket
+Note: a tag of "MALFORMED" may be added to forwards that have a process but no associated `"tcpLISTEN"` socket

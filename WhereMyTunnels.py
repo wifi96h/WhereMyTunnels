@@ -29,20 +29,19 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
+
 ps_file = "/tmp/ssh_ps" # ssh proccesses are written to this file
 ss_file = "/tmp/ssh_ss" # ssh sockets are written to this file
 
 debug = False # enables the debug printing
 
-ps_command = r'ps -ao pid,args -w --no-headers | grep "[s]sh .*" > ' + ps_file
+ps_command = r'ps -ao user,pid,args -w --no-headers | grep "[s]sh .*" > ' + ps_file
 ss_command = r'ss -nap | grep "ssh\"" > ' + ss_file
 
 ps_list = []
 ss_list = []
 ms_list = []
 malformed_list = []
-
-
 
 def get_process_by_pid (pid):
     for line in ps_list:
@@ -83,9 +82,9 @@ blue = "\033[1;34m"
 red = "\033[1;31m"
 RST_color = "\033[0m"
 
-def strip_dest_info(command):
-    # Grabs the ip and port (if specified)
-    # note the extra space to the left of the ip address regex is so it doesn't return the forwarding ip address, which looks like so "22:127.0.0.1:44" the addition of the space prevents this
+# given the full process command (ssh ...) this function grabs the username, dest_ip, and dest_port (if specified) and returns it as a dictionary
+# note the extra space to the left of the ip address regex is so it doesn't return the forwarding ip address, which looks like so "22:127.0.0.1:44" the addition of the space prevents this
+def strip_dest_info(command, proc_user):
     destination = re.search(' (\d{1,3}\.){3}\d{1,3}( -p ?\d+)?', command).group().lstrip()
     # tries to remove the port, if it isn't specified then assume it is 22 and keep the destination as is
     # if the port is specified, then use regex to seperate the ip and port from the destination string
@@ -104,7 +103,7 @@ def strip_dest_info(command):
     if user_match:
         username = user_match.group().split("@")[0]
     else:
-        username = "CURRENT_USER" # note, this will eventually be converted to the actual name of the current user running the ssh command
+        username = proc_user # note, this will eventually be converted to the actual name of the current user running the ssh command
         
     return {
         "username" : username,
@@ -163,9 +162,16 @@ while True:
         for line in file_handler:
             try:
                 if debug : print("Reading line: ", line)
+                line = re.sub(' +', ' ', line) # Condenses multiple spaces into one space
                 line = line.strip()
-                pid = (re.split(" ", line, 1))[0]
-                command = (re.split(" ", line, 1))[1]
+                print("A")
+                # Line format is: "USER PID COMMAND"
+                user = (re.split(" ", line, 2))[0] # USER|PID COMMAND, "|" represents the location of the split
+                pid = (re.split(" ", line, 2))[1] # USER|PID|COMMAND
+                command = (re.split(" ", line, 2))[2] # USER|PID|COMMAND
+                
+                # TESTING DELETE THIS
+                print("user:", user, "\npid:", pid, "\ncommand:", command)
 
                 # Master Sockets and Forwards
                 if re.search('ssh -\w*S\w*', command):
@@ -173,7 +179,7 @@ while True:
                     if re.search('ssh -\w*M\w*', command):
                         socket_file = str(re.search('S [a-zA-Z_/][\w+/]+', command).group().split(" ")[1])
                         
-                        dest_info = strip_dest_info(command)
+                        dest_info = strip_dest_info(command, user)
                         
                         # Formatting
                         out_process = {
@@ -210,7 +216,7 @@ while True:
 
                 # Traditional Tunnel
                 elif re.search('ssh .* -[LR] ?\d+', command):
-                    dest_info = strip_dest_info(command)
+                    dest_info = strip_dest_info(command, user)
                     forwards = strip_forward_info(command)
                     out_process = {
                         "org_num" : 0,
@@ -225,7 +231,8 @@ while True:
                     ps_list.append(out_process)
                 # Other Sessions
                 else:
-                    dest_info = strip_dest_info(command)
+                    print("B")
+                    dest_info = strip_dest_info(command, user)
                 
                     # Formatting
                     out_process = {
