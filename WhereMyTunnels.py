@@ -164,14 +164,11 @@ while True:
                 if debug : print("Reading line: ", line)
                 line = re.sub(' +', ' ', line) # Condenses multiple spaces into one space
                 line = line.strip()
-                print("A")
+
                 # Line format is: "USER PID COMMAND"
                 user = (re.split(" ", line, 2))[0] # USER|PID COMMAND, "|" represents the location of the split
                 pid = (re.split(" ", line, 2))[1] # USER|PID|COMMAND
                 command = (re.split(" ", line, 2))[2] # USER|PID|COMMAND
-                
-                # TESTING DELETE THIS
-                print("user:", user, "\npid:", pid, "\ncommand:", command)
 
                 # Master Sockets and Forwards
                 if re.search('ssh -\w*S\w*', command):
@@ -231,7 +228,6 @@ while True:
                     ps_list.append(out_process)
                 # Other Sessions
                 else:
-                    print("B")
                     dest_info = strip_dest_info(command, user)
                 
                     # Formatting
