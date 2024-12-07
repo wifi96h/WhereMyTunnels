@@ -103,7 +103,7 @@ def strip_dest_info(command, proc_user):
     if user_match:
         username = user_match.group().split("@")[0]
     else:
-        username = proc_user # note, this will eventually be converted to the actual name of the current user running the ssh command
+        username = proc_user # This is the user that owns the ssh process
         
     return {
         "username" : username,
