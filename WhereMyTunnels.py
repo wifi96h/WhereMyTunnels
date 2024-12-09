@@ -279,6 +279,7 @@ def strip_forward_info (command):
     
     return forward_list
 
+repetitions = 0 # this counts the number of repetitions for the main while loop
 while True:
 
     # writes commands to a file
@@ -580,7 +581,7 @@ while True:
     # NOTE: these are a lot simpler since the PIDs are unique
     for socket in ss_list:
         if socket["org_num"] == 0 and socket["type"] == "tcpESTAB":
-            print(socket)
+            if debug : print(socket)
 
             # grab associated process
             process = get_process_by_pid(socket["pid"])
@@ -602,6 +603,9 @@ while True:
             }
             ms_list.append(ssh_entry)
     
+    # clear the screen every 30 repetitions
+    if not repetitions % 30:
+        cli.clear_screen()
 
     cli.print_line('-' * 20 + " WhereMyTunnels V0.4 " + '-' * 20)
     cli.print_line('-' * 20 + "---- By Androsh7 ----" + '-' * 20)
@@ -618,7 +622,7 @@ while True:
                     child_item["org_num"] = 1 # mark as printed
                     cli.print_line("    FWD Proc: \"{}\" - PID {}".format(child_item["process"]["forward_name"], child_item["pid"])) # SOCKET FORWARD PRINT FORMAT
                     for forward in child_item["process"]["forwards"]:
-                        if forward["type"] == "MALFORMED" : print(red, end="")
+                        if forward["type"] == "MALFORMED" : print(cli_color["red"], end="")
                         cli.print_line("        FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]) +  + cli_color["blue"]) # FORWARD DATA PRINT
 
                         # find attached sessions
@@ -688,3 +692,7 @@ while True:
 
     # time delay
     time.sleep(2)
+
+    # increment repetitions
+    repetitions += 1
+
