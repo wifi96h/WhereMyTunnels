@@ -4,7 +4,7 @@ import os
 import time
 
 '''
-WhereMyTunnels.sh v0.4 written by Androsh7
+WhereMyTunnels.sh v0.5 written by Androsh7
 https://github.com/Androsh7/WhereMyTunnels
 
 MIT License
@@ -607,7 +607,7 @@ while True:
     if not repetitions % 30:
         cli.clear_screen()
 
-    cli.print_line('-' * 20 + " WhereMyTunnels V0.4 " + '-' * 20)
+    cli.print_line('-' * 20 + " WhereMyTunnels V0.5 " + '-' * 20)
     cli.print_line('-' * 20 + "---- By Androsh7 ----" + '-' * 20)
 
     # print master sockets
