@@ -82,68 +82,134 @@ blue = "\033[1;34m"
 red = "\033[1;31m"
 RST_color = "\033[0m"
 
-# line-by-line rendering engine
-class cli_render:
-    start_count = 1 
-    line_counter = start_count
-    rendered_lines = [] # this stores the length of all rendered lines
-    prev_rendered_lines = []  # this stores the length of previously rendered lines
+#  /--------------------------------------------------------------------------------\
+# |                       CLI RENDERING ENGINE - By Androsh7                         |
+# |                    Github.com/Androsh7/CLI_Rendering_Engine                      |
+#  \--------------------------------------------------------------------------------/
 
-    # clears the screen without moving the cursor
-    def clear_screen():
-        print("\033[2J")
+# dictionary for cli color codes
+cli_color = {
+    "reset": "\033[0m",
+
+    # standard colors
+    "black": "\033[30m",
+    "blue": "\033[34m",
+    "green": "\033[32m",
+    "cyan": "\033[36m",
+    "red": "\033[31m",
+    "purple": "\033[35m",
+    "brown": "\033[33m",
+    "yellow": "\033[1;33m",
+    "white": "\033[1;37m",
+
+    # light/dark colors
+    "light_gray": "\033[33[37m",
+    "dark_gray": "\033[33[1;30m",
+    "light_blue": "\033[33[1;34m",
+    "light_green": "\033[33[1;32m",
+    "light_cyan": "\033[33[1;36m",
+    "light_red": "\033[33[1;31m",
+    "light_purple": "\033[33[1;35m",
+
+    # highlights
+    "black_highlight": "\033[40m",
+    "red_highlight": "\033[41m",
+    "green_highlight": "\033[42m",
+    "yellow_highlight": "\033[43m",
+    "blue_highlight": "\033[44m",
+    "purple_highlight": "\033[45m",
+    "cyan_highlight": "\033[46m",
+    "white_highlight": "\033[47m",
+}
+
+class cli_render:
+    start_line = 1 # y-offset to start printing on
+    line_counter = start_line # keeps track of the current y-offset
+    rendered_lines = [] # this stores all rendered lines
+    prev_rendered_lines = []  # this stores all previously rendered lines
 
     @classmethod
-    def set_cursor(self, x_cord, y_cord):
-        if x_cord < 0 or y_cord < 0: 
-            return 1
-        print("\033[{};{}H".format(int(x_cord), int(y_cord)))
+    # clears the screen without moving the cursor
+    def clear_screen(self):
+        print("\033[2J", end="", sep="")
     
     @classmethod
-    def render_line(self, print_string):
-        self.set_cursor(self.line_counter, 0)
-        self.rendered_lines.append(len(print_string))
-        print(print_string, sep="", end="")
+    # sets the cursor position
+    # NOTE: the starting position for the terminal is (0,1)
+    def set_cursor(self, x_cord, y_cord):
+        # check to ensure valid position
+        if x_cord < 0 or y_cord < 0: 
+            print("invalid cursor position from set_cursor to ({},{})".format(x_cord, y_cord))
+            return 1
+        print("\033[{};{}H".format(int(y_cord), int(x_cord)), end="", sep="")
+    
+    @classmethod
+    # move cursor horizontally
+    # WARNING NO INPUT VALIDATION
+    def move_cursor_horz(self, x_change):
+        if x_change > 0:
+            print("\033[{}C".format(x_change), end="", sep="")
+        elif x_change < 0:
+            print("\033[{}D".format(x_change * -1), end="", sep="")
+    
+    @classmethod
+    # move cursor vertically
+    # WARNING NO INPUT VALIDATION
+    def move_cursor_vert(self, y_change):
+        if y_change > 0:
+            print("\033[{}B".format(y_change), end="", sep="")
+        elif y_change < 0:
+            print("\033[{}A".format(y_change * -1), end="", sep="")
 
-        # perform no padding if previous length is empty
-        if len(self.prev_rendered_lines) < self.line_counter:
-            pass
+    @classmethod
+    # prints a single line and increments the line_counter
+    def print_line(self, print_line):
+        self.set_cursor(0, self.line_counter)
+        print(print_line, end="", sep="")
 
-        # pad based on previous length if no rendering is occuring
-        elif len(self.rendered_lines) < self.line_counter:
-            print(" " * self.prev_rendered_lines[self.line_counter - self.start_count])
+        # stores previously printed lines
+        trimmed_line = re.sub("\033.*[a-zA-Z]", "", print_line) # this removes color formatting
+        self.rendered_lines.append(trimmed_line)
 
-        # pad if previous line length is greater than current length
-        elif len(self.prev_rendered_lines) > 0 and self.rendered_lines[self.line_counter - self.start_count] < self.prev_rendered_lines[self.line_counter - self.start_count]:
-            print(" " * (self.prev_rendered_lines[self.line_counter - self.start_count] - self.rendered_lines[self.line_counter - self.start_count]))
+        # grabs the length of the previous line, if one exists
+        prev_len = 0
+        if len(self.prev_rendered_lines) > self.line_counter:
+            prev_len = self.prev_rendered_lines[self.line_counter]
+
+        # pads the difference in length between the current line and the previous line
+        if len(trimmed_line) < prev_len:
+            padding = len(trimmed_line) - prev_len
+            print(" " * padding, end="", sep="")
+        
+        print("\n", end="", sep="") # this prevents issues with lines not rendering
 
         self.line_counter += 1
     
     @classmethod
-    # clears any remaining lines if the fewer lines were rendered than before
-    def clear_remaining(self):
+    # clear lines
+    def clear_lines(self):
         while self.line_counter < len(self.prev_rendered_lines):
-            print(" " * self.prev_rendered_lines[self.line_counter - self.start_count])
-            self.line_counter += 1
-    
+            padding = len(self.prev_rendered_lines[self.line_counter])
+            print(" " * padding)
+
     @classmethod
-    # resets all class values for the next cycle 
+    # reset class parameters
     def reset(self):
         self.prev_rendered_lines.clear()
-        for line in self.rendered_lines:
-            self.prev_rendered_lines.append(line)
+        self.prev_rendered_lines = self.rendered_lines
         self.rendered_lines.clear()
-        self.line_counter = self.start_count
-    
-    @classmethod
-    def debug_print(self):
-        print("----- CLI RENDER DEBUG -----")
-        print("Line counter:", self.line_counter)
-        print("Rendered Lines:", self.rendered_lines)
-        print("Previously rendered Lines:", self.prev_rendered_lines)
-        print("----- CLI RENDER DEBUG -----")
+        self.line_counter = self.start_line
 
 cli = cli_render
+
+#  /--------------------------------------------------------------------------------\
+# |                       CLI RENDERING ENGINE - By Androsh7                         |
+# |                    Github.com/Androsh7/CLI_Rendering_Engine                      |
+#  \--------------------------------------------------------------------------------/
+
+# initialize the window
+cli.clear_screen()
+cli.set_cursor(0,1)
 
 # given the full process command (ssh ...) this function grabs the username, dest_ip, and dest_port (if specified) and returns it as a dictionary
 # note the extra space to the left of the ip address regex is so it doesn't return the forwarding ip address, which looks like so "22:127.0.0.1:44" the addition of the space prevents this
@@ -537,82 +603,79 @@ while True:
             ms_list.append(ssh_entry)
     
 
-    cli.clear_screen()
-
-    cli.render_line('-' * 20 + " WhereMyTunnels V0.4 " + '-' * 20)
-    cli.render_line('-' * 20 + "---- By Androsh7 ----" + '-' * 20)
+    cli.print_line('-' * 20 + " WhereMyTunnels V0.4 " + '-' * 20)
+    cli.print_line('-' * 20 + "---- By Androsh7 ----" + '-' * 20)
 
     # print master sockets
-    cli.render_line("Master Sockets and Forwards:")
-    print(blue, end="")
+    cli.print_line("Master Sockets and Forwards:" + cli_color["blue"])
     for item in ms_list:
         if item["type"] == "MS" and item["org_num"] == 0:
-            cli.render_line("{} {}@{}:{} - PID {}".format(item["socket"]["socket_file"], item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # MASTER SOCKET PRINT FORMAT
+            cli.print_line("{} {}@{}:{} - PID {}".format(item["socket"]["socket_file"], item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # MASTER SOCKET PRINT FORMAT
             
             # print all socket forwards
             for child_item in item["attached"]:
                 if child_item["type"] == "S_FWD" and child_item["org_num"] == 0:
                     child_item["org_num"] = 1 # mark as printed
-                    cli.render_line("    FWD Proc: \"{}\" - PID {}".format(child_item["process"]["forward_name"], child_item["pid"])) # SOCKET FORWARD PRINT FORMAT
+                    cli.print_line("    FWD Proc: \"{}\" - PID {}".format(child_item["process"]["forward_name"], child_item["pid"])) # SOCKET FORWARD PRINT FORMAT
                     for forward in child_item["process"]["forwards"]:
                         if forward["type"] == "MALFORMED" : print(red, end="")
-                        cli.render_line("        FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"])) # FORWARD DATA PRINT
-                        print(blue, end="")
+                        cli.print_line("        FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]) +  + cli_color["blue"]) # FORWARD DATA PRINT
 
                         # find attached sessions
                         for session in item["attached"]:
                             if session["org_num"] == 0 and session["type"] == "S_SH" and session["src_port"] == forward["src_port"]:
                                 session["org_num"] = 1 # mark as printed
-                                cli.render_line("            SESSION: {}:{} --> {}:{}".format(session["src_ip"], session["src_port"],session["dest_ip"], session["dest_port"]))
+                                cli.print_line("            SESSION: {}:{} --> {}:{}".format(session["src_ip"], session["src_port"],session["dest_ip"], session["dest_port"]))
             
             # print all remaining associated sessions
             for child_item in item["attached"]:
                 if child_item["org_num"] == 0 and child_item["type"] == "S_SH":
                     pass
-                    cli.render_line("    ASSOCIATED SESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
-    print(RST_color)
+                    cli.print_line("    ASSOCIATED SESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
+    print(cli_color["reset"], end="")
     
     # print traditional forwards
-    cli.render_line("Traditional Forwards:" + blue)
+    cli.print_line("Traditional Forwards:" + blue)
     for item in ms_list:
         if item["type"] == "TD" and item["org_num"] == 0:
-            cli.render_line("FWD Proc: --> {}@{}:{} - PID {}".format(item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # FORWARD PRINT FORMAT
+            cli.print_line("FWD Proc: --> {}@{}:{} - PID {}".format(item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # FORWARD PRINT FORMAT
             for forward in item["process"]["forwards"]:
                 # change text to red for malformed forwards
                 if forward["type"] == "MALFORMED" : print(red, end="")
-                cli.render_line("    FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
-                print(blue, end="")
+                cli.print_line("    FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
+                print(cli_color["blue"], end="")
 
                 # find attached sessions
                 for session in item["attached"]:
                     if session["org_num"] == 0 and session["type"] == "S_SH" and session["src_port"] == forward["src_port"]:
                         session["org_num"] = 1 # mark as printed
-                        cli.render_line("        SESSION: {}:{} --> {}:{}".format(session["src_ip"], session["src_port"],session["dest_ip"], session["dest_port"]))
+                        cli.print_line("        SESSION: {}:{} --> {}:{}".format(session["src_ip"], session["src_port"],session["dest_ip"], session["dest_port"]))
 
             # print all remaining associated sessions
             for child_item in item["attached"]:
                 if child_item["org_num"] == 0 and child_item["type"] == "S_SH":
-                    cli.render_line("    ASSOCIATED SESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
+                    cli.print_line("    ASSOCIATED SESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
 
-    print(RST_color)
+    print(cli_color["reset"])
     
     # print regular sessions
-    cli.render_line("Regular Sessions" + blue)
+    cli.print_line("Regular Sessions" + cli_color["blue"])
     for item in ms_list:
         if item["type"] == "SH" and item["org_num"] == 0:
-            cli.render_line("SESSION: 127.0.0.1 --> {}:{} - PID {}".format(item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"]))
-            cli.render_line("    {}".format(item["process"]["command"][:150]))
-    print(RST_color)
+            cli.print_line("SESSION: 127.0.0.1 --> {}:{} - PID {}".format(item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"]))
+            cli.print_line("    {}".format(item["process"]["command"][:150]))
+    print(cli_color["reset"], end="")
     
     # print malformed sessions
     if len(malformed_list):
-        cli.render_line("Malformed Sessions:" + red)
+        cli.print_line("Malformed Sessions:")
+        print(cli_color["red"], end="")
         for item in malformed_list:
-            cli.render_line(item)
-        print(RST_color)
+            cli.print_line(item)
+        print(cli_color["reset"], end="")
     
     if debug : debug_print()
-
+    
     # cleaning lists
     ps_list.clear()
     ss_list.clear()
@@ -620,7 +683,7 @@ while True:
     malformed_list.clear()
 
     # reseting cli_render class attributes
-    cli.clear_remaining()
+    cli.clear_lines()
     cli.reset()
 
     # time delay
