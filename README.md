@@ -7,6 +7,11 @@ This is a python tool to view current ssh connections on linux to help diagnose 
 ### Version 0.4
 Version 0.4 is here now written in python. for those wanting the legacy version in bash, it is included in the github legacy folder.
 
+### Version 0.5
+- Added CLI Rendering Engine - Reprints lines over-each other to prevent flashing
+- Added Username detection - program now detects the user who own's the ssh process and treats that as the default login unless one is specified
+- Added Exception handling - program now has exception handling for reading `ssh_ps` and `ssh_ss` files where it will add the raw line to the malformed list
+- Fixed bug where setting up Master Socket while the program is running would lead to a crash
 # How it Works
 
 Accurate as of 12/3/2024
