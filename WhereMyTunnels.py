@@ -522,7 +522,7 @@ while True:
             cli.print_line("FWD Proc: --> {}@{}:{} - PID {}".format(item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # FORWARD PRINT FORMAT
             for forward in item["process"]["forwards"]:
                 # change text to red for malformed forwards
-                if forward["type"] == "MALFORMED" : print(red, end="")
+                if forward["type"] == "MALFORMED" : print(cli.color["red"], end="")
                 cli.print_line("    FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
                 print(cli.color["blue"], end="")
 
@@ -587,4 +587,3 @@ while True:
 
     # increment repetitions
     repetitions += 1
-

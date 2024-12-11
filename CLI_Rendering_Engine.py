@@ -4,6 +4,7 @@ import re
 # |                       CLI RENDERING ENGINE - By Androsh7                         |
 # |                    github.com/Androsh7/CLI_Rendering_Engine                      |
 #  \--------------------------------------------------------------------------------/
+
 class cli_render:
     start_line = 1 # y-offset to start printing on
     line_counter = start_line # keeps track of the current y-offset
@@ -116,7 +117,3 @@ class cli_render:
         self.prev_rendered_lines = self.rendered_lines
         self.rendered_lines.clear()
         self.line_counter = self.start_line
-#  /--------------------------------------------------------------------------------\
-# |                       CLI RENDERING ENGINE - By Androsh7                         |
-# |                    github.com/Androsh7/CLI_Rendering_Engine                      |
-#  \--------------------------------------------------------------------------------/
