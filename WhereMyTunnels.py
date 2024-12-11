@@ -2,6 +2,7 @@
 import re
 import os
 import time
+from CLI_Rendering_Engine import cli_render # github.com/Androsh7/CLI_Rendering_Engine
 
 '''
 WhereMyTunnels.sh v0.5 written by Androsh7
@@ -35,31 +36,35 @@ ss_file = "/tmp/ssh_ss" # ssh sockets are written to this file
 
 debug = False # enables the debug printing
 
+time_delay = 2 # number of seconds between repetitons
+
 ps_command = r'ps -ao user,pid,args -w --no-headers | grep "[s]sh .*" > ' + ps_file
 ss_command = r'ss -nap | grep "ssh\"" > ' + ss_file
 
+# initialize lists
 ps_list = []
 ss_list = []
 ms_list = []
+debug_list = []
 malformed_list = []
 
 def get_process_by_pid (pid):
     for line in ps_list:
         if line["pid"] == pid:
             return line
-    if debug : print("Could not find process with pid", pid)
+    if debug : debug_list.append("Could not find process with pid " + pid)
     
 def get_process_by_src_port (type, src_port):
     for line in ps_list:
         if line["type"] == type and line["src_port"] == src_port:
             return line
-    if debug : print("Could not find process with a type of", type, "and a source port of", src_port)
+    if debug : debug_list.append("Could not find process with a type of " + type + " and a source port of " + src_port)
     
 def get_socket_by_pid (pid):
     for line in ss_list:
         if line["pid"] == pid:
             return line
-    if debug : print("Could not find socket with pid", pid)
+    if debug : debug_list.append("Could not find socket with pid" + pid)
     
 
 def debug_print ():
@@ -78,136 +83,8 @@ def debug_print ():
 def clear_screen ():
     os.system("clear") # Switch to test on windows
 
-blue = "\033[1;34m"
-red = "\033[1;31m"
-RST_color = "\033[0m"
-
-#  /--------------------------------------------------------------------------------\
-# |                       CLI RENDERING ENGINE - By Androsh7                         |
-# |                    Github.com/Androsh7/CLI_Rendering_Engine                      |
-#  \--------------------------------------------------------------------------------/
-
-# dictionary for cli color codes
-cli_color = {
-    "reset": "\033[0m",
-
-    # standard colors
-    "black": "\033[30m",
-    "blue": "\033[34m",
-    "green": "\033[32m",
-    "cyan": "\033[36m",
-    "red": "\033[31m",
-    "purple": "\033[35m",
-    "brown": "\033[33m",
-    "yellow": "\033[1;33m",
-    "white": "\033[1;37m",
-
-    # light/dark colors
-    "light_gray": "\033[33[37m",
-    "dark_gray": "\033[33[1;30m",
-    "light_blue": "\033[33[1;34m",
-    "light_green": "\033[33[1;32m",
-    "light_cyan": "\033[33[1;36m",
-    "light_red": "\033[33[1;31m",
-    "light_purple": "\033[33[1;35m",
-
-    # highlights
-    "black_highlight": "\033[40m",
-    "red_highlight": "\033[41m",
-    "green_highlight": "\033[42m",
-    "yellow_highlight": "\033[43m",
-    "blue_highlight": "\033[44m",
-    "purple_highlight": "\033[45m",
-    "cyan_highlight": "\033[46m",
-    "white_highlight": "\033[47m",
-}
-
-class cli_render:
-    start_line = 1 # y-offset to start printing on
-    line_counter = start_line # keeps track of the current y-offset
-    rendered_lines = [] # this stores all rendered lines
-    prev_rendered_lines = []  # this stores all previously rendered lines
-
-    @classmethod
-    # clears the screen without moving the cursor
-    def clear_screen(self):
-        print("\033[2J", end="", sep="")
-    
-    @classmethod
-    # sets the cursor position
-    # NOTE: the starting position for the terminal is (0,1)
-    def set_cursor(self, x_cord, y_cord):
-        # check to ensure valid position
-        if x_cord < 0 or y_cord < 0: 
-            print("invalid cursor position from set_cursor to ({},{})".format(x_cord, y_cord))
-            return 1
-        print("\033[{};{}H".format(int(y_cord), int(x_cord)), end="", sep="")
-    
-    @classmethod
-    # move cursor horizontally
-    # WARNING NO INPUT VALIDATION
-    def move_cursor_horz(self, x_change):
-        if x_change > 0:
-            print("\033[{}C".format(x_change), end="", sep="")
-        elif x_change < 0:
-            print("\033[{}D".format(x_change * -1), end="", sep="")
-    
-    @classmethod
-    # move cursor vertically
-    # WARNING NO INPUT VALIDATION
-    def move_cursor_vert(self, y_change):
-        if y_change > 0:
-            print("\033[{}B".format(y_change), end="", sep="")
-        elif y_change < 0:
-            print("\033[{}A".format(y_change * -1), end="", sep="")
-
-    @classmethod
-    # prints a single line and increments the line_counter
-    def print_line(self, print_line):
-        self.set_cursor(0, self.line_counter)
-        print(print_line, end="", sep="")
-
-        # stores previously printed lines
-        trimmed_line = re.sub("\033.*[a-zA-Z]", "", print_line) # this removes color formatting
-        self.rendered_lines.append(trimmed_line)
-
-        # grabs the length of the previous line, if one exists
-        prev_len = 0
-        if len(self.prev_rendered_lines) > self.line_counter:
-            prev_len = self.prev_rendered_lines[self.line_counter]
-
-        # pads the difference in length between the current line and the previous line
-        if len(trimmed_line) < prev_len:
-            padding = len(trimmed_line) - prev_len
-            print(" " * padding, end="", sep="")
-        
-        print("\n", end="", sep="") # this prevents issues with lines not rendering
-
-        self.line_counter += 1
-    
-    @classmethod
-    # clear lines
-    def clear_lines(self):
-        while self.line_counter < len(self.prev_rendered_lines):
-            padding = len(self.prev_rendered_lines[self.line_counter])
-            print(" " * padding)
-
-    @classmethod
-    # reset class parameters
-    def reset(self):
-        self.prev_rendered_lines.clear()
-        self.prev_rendered_lines = self.rendered_lines
-        self.rendered_lines.clear()
-        self.line_counter = self.start_line
-
-cli = cli_render
-
-#  /--------------------------------------------------------------------------------\
-# |                       CLI RENDERING ENGINE - By Androsh7                         |
-# |                    Github.com/Androsh7/CLI_Rendering_Engine                      |
-#  \--------------------------------------------------------------------------------/
-
 # initialize the window
+cli = cli_render
 cli.clear_screen()
 cli.set_cursor(0,1)
 
@@ -260,7 +137,7 @@ def strip_forward_info (command):
             dest_ip = forward_srcdest[1]
             src_port = forward_srcdest[2]
         else:
-            if debug : print("could not identify forward type")
+            if debug : debug_list.append("could not identify forward type")
             continue
         
         # build forward entry
@@ -275,7 +152,7 @@ def strip_forward_info (command):
     
     dynamic_forwards = re.findall('-\w*D\w* ?\d{1,6}', command)
     for line in dynamic_forwards:
-        if debug : print("DYNAMIC FORWARDS ARE NOT CURRENTLY SUPPORTED")
+        if debug : debug_list.append("DYNAMIC FORWARDS ARE NOT CURRENTLY SUPPORTED")
     
     return forward_list
 
@@ -287,11 +164,11 @@ while True:
     os.system(ss_command)
 
     # reads the process file
-    if debug : print("----- Reading ssh_ps -----")
+    if debug : debug_list.append("----- Reading ssh_ps -----")
     with open(ps_file, 'r') as file_handler:
         for line in file_handler:
             try:
-                if debug : print("Reading line: ", line)
+                if debug : debug_list.append("Reading line: ", line)
                 line = re.sub(' +', ' ', line) # Condenses multiple spaces into one space
                 line = line.strip()
 
@@ -372,15 +249,15 @@ while True:
                     }
                     ps_list.append(out_process)
             except:
-                if debug : print("MALFORMED SESSION")
+                if debug : debug_list.append("MALFORMED SESSION")
                 malformed_list.append(line)
     
     # read the socket file
-    if debug : print("----- reading ssh_ss -----")
+    if debug : debug_list.append("----- reading ssh_ss -----")
     with open(ss_file, 'r') as file_handler:
         for line in file_handler:
             try:
-                if debug : print("reading line: [{}]".format(line))
+                if debug : debug_list.appendt("reading line: [{}]".format(line))
                 line = line.rstrip()
 
                 pid = re.search('pid=\d+', line).group().split("=")[1]
@@ -397,7 +274,7 @@ while True:
                     try:
                         socket = re.search('[/\w]+\.[a-zA-Z0-9]{5,} \d+', line).group()
                     except:
-                        if debug : print("Unknown Socket Detected, ignoring socket")
+                        if debug : debug_list.append("Unknown Socket Detected, ignoring socket")
                         continue
                     
                     # see the above documentation for an explanation, this breaks up the socket_file I.E: "/tmp/test" and the socket_code I.E: "BiD6RlLl7ZqhQS2w"
@@ -420,7 +297,7 @@ while True:
                 
                 # this aborts if no source and destination is found
                 if not src_dest:
-                    if debug : print("Could not find a valid source and/or destination ip for the socket, ignoring socket")
+                    if debug : debug_list.append("Could not find a valid source and/or destination ip for the socket, ignoring socket")
                     continue 
 
                 # this section is all about breaking apart the src_dest into, src_port, src_ip, dst_port, dst_ip
@@ -443,7 +320,7 @@ while True:
                     "dest_ip" : dest_ip,
                     "dest_port" : dest_port,
                 }
-                if debug : print("Creating Socket: [{}]".format(out_socket))
+                if debug : debug_list.append("Creating Socket: [{}]".format(out_socket))
                 ss_list.append(out_socket)
             except:
                 pass
@@ -457,7 +334,7 @@ while True:
            
             # if no socket is attached then the process is malformed
             if not master_socket:
-                if debug : print("MALFORMED Master Socket Detected")
+                if debug : debug_list.append("MALFORMED Master Socket Detected")
                 malformed_list.append("{} - PID {}".format(master_process["command"], master_process["pid"]))
                 master_process["org_num"] = -2 # mark is malformed
                 continue
@@ -465,7 +342,7 @@ while True:
             # additional check to ensure valid selection
             try:
                 if not (master_socket["socket_file"] == master_process["socket_file"]):
-                    if debug : print("Master socket with matching socket and process pids do not have matching socket_file :(")
+                    if debug : debug_list.append("Master socket with matching socket and process pids do not have matching socket_file :(")
                     continue
             except:
                 break
@@ -501,7 +378,7 @@ while True:
                                 found_socket = True
                                 break
                         if not found_socket:
-                            if debug : print("could not find socket associated with forward")
+                            if debug : debug_list.append("could not find socket associated with forward")
                             forward_process["type"] = "MALFORMED"
                     
                     child_entry = {
@@ -558,7 +435,7 @@ while True:
                         found_socket = True
                 
                 if not found_socket:
-                    if debug : print("could not find socket associated with forward")
+                    if debug : debug_list.append("could not find socket associated with forward")
                     forward_process["type"] = "MALFORMED"
             
             # find attached sessions
@@ -581,13 +458,13 @@ while True:
     # NOTE: these are a lot simpler since the PIDs are unique
     for socket in ss_list:
         if socket["org_num"] == 0 and socket["type"] == "tcpESTAB":
-            if debug : print(socket)
+            if debug : debug_list.append(socket)
 
             # grab associated process
             process = get_process_by_pid(socket["pid"])
             
             if not process:
-                if debug : print("could not find process with pid", socket["pid"])
+                if debug : debug_list.append("could not find process with pid " + socket["pid"])
                 continue
 
             socket["org_num"] = 1 # mark as sorted
@@ -611,7 +488,7 @@ while True:
     cli.print_line('-' * 20 + "---- By Androsh7 ----" + '-' * 20)
 
     # print master sockets
-    cli.print_line("Master Sockets and Forwards:" + cli_color["blue"])
+    cli.print_line("Master Sockets and Forwards:" + cli.color["blue"])
     for item in ms_list:
         if item["type"] == "MS" and item["org_num"] == 0:
             cli.print_line("{} {}@{}:{} - PID {}".format(item["socket"]["socket_file"], item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # MASTER SOCKET PRINT FORMAT
@@ -622,8 +499,8 @@ while True:
                     child_item["org_num"] = 1 # mark as printed
                     cli.print_line("    FWD Proc: \"{}\" - PID {}".format(child_item["process"]["forward_name"], child_item["pid"])) # SOCKET FORWARD PRINT FORMAT
                     for forward in child_item["process"]["forwards"]:
-                        if forward["type"] == "MALFORMED" : print(cli_color["red"], end="")
-                        cli.print_line("        FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]) +  + cli_color["blue"]) # FORWARD DATA PRINT
+                        if forward["type"] == "MALFORMED" : print(cli.color["red"], end="")
+                        cli.print_line("        FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]) +  + cli.color["blue"]) # FORWARD DATA PRINT
 
                         # find attached sessions
                         for session in item["attached"]:
@@ -636,10 +513,10 @@ while True:
                 if child_item["org_num"] == 0 and child_item["type"] == "S_SH":
                     pass
                     cli.print_line("    ASSOCIATED SESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
-    print(cli_color["reset"], end="")
+    print(cli.color["reset"], end="")
     
     # print traditional forwards
-    cli.print_line("Traditional Forwards:" + blue)
+    cli.print_line("Traditional Forwards:" + cli.color["blue"])
     for item in ms_list:
         if item["type"] == "TD" and item["org_num"] == 0:
             cli.print_line("FWD Proc: --> {}@{}:{} - PID {}".format(item["process"]["user"], item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"])) # FORWARD PRINT FORMAT
@@ -647,7 +524,7 @@ while True:
                 # change text to red for malformed forwards
                 if forward["type"] == "MALFORMED" : print(red, end="")
                 cli.print_line("    FWD: 127.0.0.1:{} --> {}:{} - {}".format(forward["src_port"], forward["dest_ip"], forward["dest_port"], forward["type"]))
-                print(cli_color["blue"], end="")
+                print(cli.color["blue"], end="")
 
                 # find attached sessions
                 for session in item["attached"]:
@@ -660,30 +537,45 @@ while True:
                 if child_item["org_num"] == 0 and child_item["type"] == "S_SH":
                     cli.print_line("    ASSOCIATED SESSION: {}:{} --> {}:{}".format(child_item["src_ip"], child_item["src_port"], child_item["dest_ip"], child_item["dest_port"])) # MASTER SOCKET SESSION PRINT FORMAT
 
-    print(cli_color["reset"])
+    print(cli.color["reset"])
     
     # print regular sessions
-    cli.print_line("Regular Sessions" + cli_color["blue"])
+    cli.print_line("Regular Sessions" + cli.color["blue"])
     for item in ms_list:
         if item["type"] == "SH" and item["org_num"] == 0:
             cli.print_line("SESSION: 127.0.0.1 --> {}:{} - PID {}".format(item["process"]["dest_ip"], item["process"]["dest_port"], item["pid"]))
             cli.print_line("    {}".format(item["process"]["command"][:150]))
-    print(cli_color["reset"], end="")
+    print(cli.color["reset"], end="")
     
     # print malformed sessions
     if len(malformed_list):
         cli.print_line("Malformed Sessions:")
-        print(cli_color["red"], end="")
+        print(cli.color["red"], end="")
         for item in malformed_list:
             cli.print_line(item)
-        print(cli_color["reset"], end="")
+        print(cli.color["reset"], end="")
     
-    if debug : debug_print()
-    
+    # prints debug information
+    if debug:
+        cli.print_line("----- DEBUG INFORMATION -----")
+        for line in debug_list:
+            cli.print_line(line)
+        cli.print_line("-- ps_list --")
+        for line in ps_list:
+            cli.print_line(line)
+        cli.print_line("-- ss_list --")
+        for line in ss_list:
+            cli.print_line(line)
+        cli.print_line("-- ms_list --")
+        for line in ms_list:
+            cli.print_line(line)        
+        cli.print_line("----- DEBUG INFORMATION -----")
+
     # cleaning lists
     ps_list.clear()
     ss_list.clear()
     ms_list.clear()
+    debug_list.clear()
     malformed_list.clear()
 
     # reseting cli_render class attributes
@@ -691,7 +583,7 @@ while True:
     cli.reset()
 
     # time delay
-    time.sleep(2)
+    time.sleep(time_delay)
 
     # increment repetitions
     repetitions += 1
